@@ -1,0 +1,25 @@
+{
+  "server": "localhost:1",
+  "username": "test",
+  "password": "pw",
+  "filters": [
+    {
+      "metricName": "mqtt.value",
+      "topics": [
+        "a/b/c",
+        "b/#",
+        "c/d/e/#>/json/path"
+      ],
+      "labelPatterns": [
+        "a/(?<device>[^/]*)/(?<location>[^/]*)",
+        "b/(?<name>[^/]*)"
+      ],
+      "valueMappings": {
+        "yes": "1",
+        "no": "0",
+        "on=(.*)": "$1"
+      },
+      "enableArrays": true
+    }
+  ]
+}
