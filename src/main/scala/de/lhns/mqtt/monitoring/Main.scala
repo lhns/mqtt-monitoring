@@ -8,71 +8,55 @@ import io.circe.{Codec, Decoder, Json}
 import io.opentelemetry.api.OpenTelemetry
 import io.opentelemetry.api.common.{AttributeKey, Attributes}
 import io.opentelemetry.sdk.autoconfigure.AutoConfiguredOpenTelemetrySdk
+import org.log4s.getLogger
 import ox.*
 import ox.channels.Channel
 
+import java.nio.charset.StandardCharsets
 import java.util.UUID
 import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.*
 
 object Main extends OxApp {
-  case class Config(
-                     server: SocketAddress[Host],
-                     username: String,
-                     password: String,
-                     filters: List[FilterConfig]
-                   )
-
-  case class FilterConfig(
-                           metricName: Option[String],
-                           topics: List[String],
-                           labelPatterns: Option[List[String]],
-                           valueMappings: Option[Map[String, String]],
-                           enableArrays: Option[Boolean],
-                           warnInvalidValues: Option[Boolean]
-                         ) {
-    val metricNameOrDefault: String = metricName.getOrElse("mqtt.value")
-
-    val labelPatternsOrDefault: List[String] = labelPatterns.getOrElse(List.empty)
-
-    val valueMappingsOrDefault: Map[String, String] = valueMappings.getOrElse(Map.empty)
-
-    val enableArraysOrDefault: Boolean = enableArrays.getOrElse(false)
-
-    val warnInvalidValuesOrDefault: Boolean = warnInvalidValues.getOrElse(true)
-  }
+  private val logger = getLogger
 
   def run(args: Vector[String])(using Ox): ExitCode = {
+    logger.info("loading config")
+
+    val config = Config.fromEnv
+
+    logger.info("loaded config")
+
+    val openTelemetry: OpenTelemetry = AutoConfiguredOpenTelemetrySdk.initialize().getOpenTelemetrySdk
+    val meter = openTelemetry.getMeter(getClass.getName)
+
+    logger.info("connecting to mqtt server")
+
     val client =
       MqttClient.builder()
         .useMqttVersion3()
         .identifier(s"mqtt-monitoring/${UUID.randomUUID()}")
-        .serverHost("")
-        .serverPort(1883)
+        .serverHost(config.server.host.toString)
+        .serverPort(config.server.port.value)
         .buildBlocking()
 
     useInScope {
       client
         .connectWith()
         .simpleAuth()
-        .username("")
-        .password("".getBytes)
+        .username(config.username)
+        .password(config.password.getBytes(StandardCharsets.UTF_8))
         .applySimpleAuth()
         .send()
     } { _ =>
+      logger.info("disconnecting from mqtt server")
+
       client.disconnect()
+
+      logger.info("disconnected from mqtt server")
     }
 
-    println("connected")
-
-    // mqtt/topic/+/test/#>/json/#/value
-    case class TopicFilter(
-                            topics: Seq[String],
-                            enableArrays: Option[Boolean],
-                            mappings: Option[Map[String, Double]]
-                          )derives Codec {
-      val mqttTopics: Seq[String] = topics.map(_.split("/").takeWhile(_ != "#>").mkString("/"))
-    }
+    logger.info("connected to mqtt server")
 
     // TODO: unsubscribe
 
@@ -95,9 +79,6 @@ object Main extends OxApp {
         c.send(publishes.receive())
       }
     }
-
-    val openTelemetry: OpenTelemetry = AutoConfiguredOpenTelemetrySdk.initialize().getOpenTelemetrySdk
-    val meter = openTelemetry.getMeter(getClass.getName)
 
     val gauge = meter.gaugeBuilder("mqtt.value").build()
 
