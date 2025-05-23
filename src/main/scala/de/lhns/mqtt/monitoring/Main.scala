@@ -26,7 +26,9 @@ object Main extends OxApp {
     logger.info("loaded config")
 
     config.maxCardinality.foreach(cardinality => System.setProperty("otel.java.metrics.cardinality.limit", cardinality.toString))
-    val openTelemetry: OpenTelemetry = AutoConfiguredOpenTelemetrySdk.initialize().getOpenTelemetrySdk
+    val openTelemetry: OpenTelemetry = useInScope(
+      AutoConfiguredOpenTelemetrySdk.initialize().getOpenTelemetrySdk
+    )(_.shutdown())
     val meter = openTelemetry.getMeter(getClass.getName)
 
     logger.info("connecting to mqtt server")
