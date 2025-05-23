@@ -1,5 +1,8 @@
 package de.lhns.mqtt.monitoring
 
+import cats.syntax.all.*
+import io.circe.Codec
+
 case class TopicPattern(segments: List[String]) {
   override def toString: String = segments.mkString("/")
 
@@ -33,8 +36,17 @@ case class TopicPattern(segments: List[String]) {
 
     loop(segments, topic.segments)
   }
+
+  /*
+  A non-standard way to specify the structure of a json payload.
+  Example: mqtt/topic/+/test/#>/json/#/value
+  */
+  def stripJsonPattern: TopicPattern =
+    TopicPattern(segments.takeWhile(_ != "#>"))
 }
 
 object TopicPattern {
   def fromString(pattern: String): TopicPattern = TopicPattern(pattern.split("/", -1).toList)
+
+  given Codec[TopicPattern] = Codec.implied[String].imap(fromString)(_.toString)
 }

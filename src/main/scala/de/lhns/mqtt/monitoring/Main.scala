@@ -1,21 +1,19 @@
 package de.lhns.mqtt.monitoring
 
-import com.comcast.ip4s.{Host, SocketAddress}
-import com.hivemq.client.mqtt.datatypes.MqttTopic
 import com.hivemq.client.mqtt.mqtt3.message.publish.Mqtt3Publish
 import com.hivemq.client.mqtt.{MqttClient, MqttGlobalPublishFilter}
-import io.circe.{Codec, Decoder, Json}
+import io.circe.Json
 import io.opentelemetry.api.OpenTelemetry
 import io.opentelemetry.api.common.{AttributeKey, Attributes}
+import io.opentelemetry.api.metrics.DoubleGauge
 import io.opentelemetry.sdk.autoconfigure.AutoConfiguredOpenTelemetrySdk
-import org.log4s.getLogger
+import org.log4s.{MDC, getLogger}
 import ox.*
 import ox.channels.Channel
 
 import java.nio.charset.StandardCharsets
 import java.util.UUID
-import scala.concurrent.duration.*
-import scala.jdk.CollectionConverters.*
+import scala.util.control.NonFatal
 
 object Main extends OxApp {
   private val logger = getLogger
@@ -27,6 +25,7 @@ object Main extends OxApp {
 
     logger.info("loaded config")
 
+    config.maxCardinality.foreach(cardinality => System.setProperty("otel.java.metrics.cardinality.limit", cardinality.toString))
     val openTelemetry: OpenTelemetry = AutoConfiguredOpenTelemetrySdk.initialize().getOpenTelemetrySdk
     val meter = openTelemetry.getMeter(getClass.getName)
 
@@ -60,31 +59,40 @@ object Main extends OxApp {
 
     // TODO: unsubscribe
 
-    val publishes = useCloseableInScope(client.publishes(MqttGlobalPublishFilter.ALL))
 
-    val c = Channel.bufferedDefault[Mqtt3Publish]
+    val messages = Channel.bufferedDefault[Mqtt3Publish]
 
     fork {
-      /*client
-        .subscribeWith()
-        .topicFilter("test/asdf")
-        .send()*/
+      logger.info("registering mqtt listener")
 
-      client
-        .subscribeWith()
-        .topicFilter("#")
-        .send()
+      val publishes = useCloseableInScope(client.publishes(MqttGlobalPublishFilter.SUBSCRIBED))
+
+      config.filters
+        .flatMap(_.topics)
+        .distinct
+        .foreach { topic =>
+          useInScope {
+            logger.debug(s"subscribing to mqtt topic: $topic")
+            client
+              .subscribeWith()
+              .topicFilter(topic.toString)
+              .send()
+            logger.debug(s"subscribed to mqtt topic: $topic")
+          } { _ =>
+            logger.debug(s"unsubscribing from mqtt topic: $topic")
+            client.unsubscribeWith()
+              .topicFilter(topic.toString)
+              .send()
+            logger.debug(s"unsubscribed from mqtt topic: $topic")
+          }
+        }
+
+      logger.info("listening for mqtt messages")
 
       while (true) {
-        c.send(publishes.receive())
+        messages.send(publishes.receive())
       }
     }
-
-    val gauge = meter.gaugeBuilder("mqtt.value").build()
-
-    val topicKey = AttributeKey.stringKey("mqtt.topic")
-
-    case class TopicValues(values: Map[Topic, Double])
 
     def valuesFromJson(
                         json: Json,
@@ -128,7 +136,7 @@ object Main extends OxApp {
         case None =>
           io.circe.parser.parse(string) match {
             case Right(json) =>
-              valuesFromJson(json, topic, mapping, enableArrays)
+              valuesFromJson(json, topic / "#>", mapping, enableArrays)
             case Left(_) =>
               mapping(topic)(string) match {
                 case Some(double) => Map(topic -> double)
@@ -137,18 +145,97 @@ object Main extends OxApp {
           }
       }
 
+    val topicKey = AttributeKey.stringKey("mqtt.topic")
+
+    val gaugeByMetricName: Map[String, DoubleGauge] =
+      config.filters.map(_.metricNameOrDefault).distinct.map { metricName =>
+        val gauge = meter.gaugeBuilder(metricName).build()
+        metricName -> gauge
+      }.toMap
+
     while (true) {
-      val msg = c.receive()
+      val msg = messages.receive()
       val topic = Topic(msg.getTopic)
-      if (topic.segments.startsWith(List("zigbee2mqtt"))) {
-        val msgString = new String(msg.getPayloadAsBytes)
-        val values = valuesFromString(msgString, topic, _ => _ => None, false)
-        values.foreach { case (topic, value) =>
-          println(s"$topic: $value")
-          //gauge.set(value, Attributes.of(topicKey, topic.toString))
+
+      MDC("topic") = topic.toString
+
+      config.filters
+        .find(_.topics.exists(_.matches(topic, anchored = true)))
+        .filterNot(_.discardOrDefault)
+        .foreach { filter =>
+          val gauge = gaugeByMetricName(filter.metricNameOrDefault)
+
+          val msgString = try {
+            new String(msg.getPayloadAsBytes, StandardCharsets.UTF_8)
+          } catch {
+            case NonFatal(e) =>
+              if (!filter.ignoreWarningsOrDefault)
+                logger.warn(e)(s"mqtt message is not a string")
+              throw e
+          }
+          val values = valuesFromString(
+            string = msgString,
+            topic = topic,
+            mapping = topic => string => {
+              MDC("topic") = topic.toString
+              filter.valueMappingsOrDefault.collectFirst(Function.unlift { (pattern, replacement) =>
+                val matcher = pattern.pattern.matcher(string)
+                if (matcher.matches())
+                  Some(matcher.replaceFirst(replacement))
+                else
+                  None
+              }) match {
+                case None =>
+                  if (!filter.ignoreWarningsOrDefault)
+                    logger.warn(s"no mapping defined for mqtt message: $string")
+                  None
+                case Some(mappedString) =>
+                  mappedString.toDoubleOption match {
+                    case None =>
+                      logger.error(s"mapped value is not a double: $mappedString")
+                      None
+                    case e => e
+                  }
+              }
+            },
+            enableArrays = filter.enableArraysOrDefault
+          )
+
+          values.foreach { (topic, value) =>
+            MDC.clear()
+            MDC("topic") = topic.toString
+            MDC("metric") = filter.metricNameOrDefault
+
+            val labels: Map[String, String] = filter.labelMatchersOrDefault.collectFirst(Function.unlift { pattern =>
+              val matcher = pattern.pattern.matcher(topic.toString)
+              if (matcher.matches())
+                Some(pattern.namedGroupMatches(matcher))
+              else
+                None
+            }).getOrElse(Map.empty)
+
+            MDC.addAll(labels.map((k, v) => s"label.$k" -> v))
+
+            logger.debug(s"parsed value: $value")
+
+            val attributes =
+              labels.foldLeft {
+                  if (filter.topicLabelOrDefault)
+                    Attributes.builder()
+                      .put(topicKey, topic.toString)
+                  else
+                    Attributes.builder()
+                } { case (attributes, (k, v)) =>
+                  attributes.put(k, v)
+                }
+                .build()
+
+            gauge.set(value, attributes)
+          }
         }
-      }
     }
+
+    MDC.clear()
 
     ExitCode.Success
   }

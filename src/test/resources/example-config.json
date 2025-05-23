@@ -1,5 +1,5 @@
 {
-  "server": "localhost:1",
+  "server": "localhost:1883",
   "username": "test",
   "password": "pw",
   "filters": [
@@ -10,7 +10,7 @@
         "b/#",
         "c/d/e/#>/json/path"
       ],
-      "labelPatterns": [
+      "labelMatchers": [
         "a/(?<device>[^/]*)/(?<location>[^/]*)",
         "b/(?<name>[^/]*)"
       ],
