@@ -1,6 +1,10 @@
-ThisBuild / version := "0.1.0-SNAPSHOT"
-
 ThisBuild / scalaVersion := "3.7.0"
+
+ThisBuild / version := {
+  val Tag = "refs/tags/v?([0-9]+(?:\\.[0-9]+)+(?:[+-].*)?)".r
+  sys.env.get("CI_VERSION").collect { case Tag(tag) => tag }
+    .getOrElse("0.0.1-SNAPSHOT")
+}
 
 lazy val root = (project in file("."))
   .settings(
