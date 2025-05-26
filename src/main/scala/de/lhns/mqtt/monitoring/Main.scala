@@ -71,6 +71,7 @@ object Main extends OxApp {
 
       config.filters
         .flatMap(_.topics)
+        .map(_.stripJsonPattern)
         .distinct
         .foreach { topic =>
           useInScope {
