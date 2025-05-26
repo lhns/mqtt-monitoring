@@ -18,5 +18,16 @@ lazy val root = (project in file("."))
       "org.log4s" %% "log4s" % "1.10.0",
       "org.scalameta" %% "munit" % "1.1.1" % Test
     ),
-    testFrameworks += new TestFramework("munit.Framework")
+    testFrameworks += new TestFramework("munit.Framework"),
+    assembly / assemblyJarName := s"${name.value}-${version.value}.sh.bat",
+    assembly / assemblyOption := (assembly / assemblyOption).value
+      .withPrependShellScript(Some(AssemblyPlugin.defaultUniversalScript(shebang = false))),
+    assembly / assemblyMergeStrategy := {
+      case PathList(paths@_*) if paths.last == "module-info.class" => MergeStrategy.discard
+      case PathList("META-INF", path@_*) if path.lastOption.exists(_.endsWith(".kotlin_module")) => MergeStrategy.discard
+      case PathList("META-INF", path@_*) if path.lastOption.exists(_.endsWith("io.netty.versions.properties")) => MergeStrategy.discard
+      case x =>
+        val oldStrategy = (assembly / assemblyMergeStrategy).value
+        oldStrategy(x)
+    },
   )
