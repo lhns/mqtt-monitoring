@@ -26,6 +26,9 @@ object Main extends OxApp {
     logger.info("loaded config")
 
     config.maxCardinality.foreach(cardinality => System.setProperty("otel.java.metrics.cardinality.limit", cardinality.toString))
+
+    config.exportInterval.foreach(interval => System.setProperty("otel.metric.export.interval", interval.toSeconds.toString))
+
     val openTelemetry: OpenTelemetry = useInScope(
       AutoConfiguredOpenTelemetrySdk.initialize().getOpenTelemetrySdk
     )(_.shutdown())

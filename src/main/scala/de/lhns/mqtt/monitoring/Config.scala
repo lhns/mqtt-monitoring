@@ -6,12 +6,14 @@ import de.lhns.mqtt.monitoring.Config.FilterConfig
 import io.circe.Codec
 
 import scala.collection.immutable.ListMap
+import scala.concurrent.duration.{Duration, FiniteDuration}
 
 case class Config(
                    server: SocketAddress[Host],
                    username: String,
                    password: String,
                    maxCardinality: Option[Int],
+                   exportInterval: Option[FiniteDuration],
                    filters: List[FilterConfig]
                  )derives Codec
 
@@ -42,6 +44,11 @@ object Config {
   }
 
   private given Codec[SocketAddress[Host]] = Codec.implied[String].imap(SocketAddress.fromString(_).get)(_.toString)
+
+  private given Codec[FiniteDuration] = Codec.implied[String].imap(Duration(_) match {
+    case duration: FiniteDuration => duration
+    case e => throw new RuntimeException(s"Unsupported duration: $e")
+  })(_.toString)
 
   def fromEnv: Config =
     sys.env.get("CONFIG")
