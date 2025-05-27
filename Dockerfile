@@ -1,4 +1,4 @@
-FROM openjdk:21
+FROM openjdk:25
 
 COPY target/scala-*/*.sh.bat ./
 
