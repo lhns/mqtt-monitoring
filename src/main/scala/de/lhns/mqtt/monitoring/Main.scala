@@ -7,6 +7,7 @@ import io.opentelemetry.api.OpenTelemetry
 import io.opentelemetry.api.common.{AttributeKey, Attributes}
 import io.opentelemetry.api.metrics.DoubleGauge
 import io.opentelemetry.sdk.autoconfigure.AutoConfiguredOpenTelemetrySdk
+import io.opentelemetry.sdk.metrics.{Aggregation, InstrumentSelector, SdkMeterProvider, View}
 import org.log4s.{MDC, getLogger}
 import ox.*
 import ox.channels.Channel
