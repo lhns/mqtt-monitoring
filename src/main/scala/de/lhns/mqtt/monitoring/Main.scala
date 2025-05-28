@@ -7,7 +7,6 @@ import io.opentelemetry.api.OpenTelemetry
 import io.opentelemetry.api.common.{AttributeKey, Attributes}
 import io.opentelemetry.api.metrics.DoubleGauge
 import io.opentelemetry.sdk.autoconfigure.AutoConfiguredOpenTelemetrySdk
-import io.opentelemetry.sdk.metrics.{Aggregation, InstrumentSelector, SdkMeterProvider, View}
 import org.log4s.{MDC, getLogger}
 import ox.*
 import ox.channels.Channel
@@ -28,13 +27,7 @@ object Main extends OxApp {
 
     config.maxCardinality.foreach(cardinality => System.setProperty("otel.java.metrics.cardinality.limit", cardinality.toString))
 
-    config.exportInterval.foreach(interval => System.setProperty("otel.metric.export.interval", interval.toSeconds.toString))
-
-    SdkMeterProvider.builder()
-      .registerView(
-        InstrumentSelector.builder().setName("queueSize").build(),
-        View.builder().setAggregation(Aggregation.drop()).build()
-      )
+    config.exportInterval.foreach(interval => System.setProperty("otel.metric.export.interval", s"${interval.toMillis}ms"))
 
     val openTelemetry: OpenTelemetry = useInScope(
       AutoConfiguredOpenTelemetrySdk.initialize().getOpenTelemetrySdk
