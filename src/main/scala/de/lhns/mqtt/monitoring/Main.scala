@@ -30,15 +30,15 @@ object Main extends OxApp {
 
     config.exportInterval.foreach(interval => System.setProperty("otel.metric.export.interval", interval.toSeconds.toString))
 
-    val openTelemetry: OpenTelemetry = useInScope(
-      AutoConfiguredOpenTelemetrySdk.initialize().getOpenTelemetrySdk
-    )(_.shutdown())
-
     SdkMeterProvider.builder()
       .registerView(
         InstrumentSelector.builder().setName("queueSize").build(),
         View.builder().setAggregation(Aggregation.drop()).build()
       )
+
+    val openTelemetry: OpenTelemetry = useInScope(
+      AutoConfiguredOpenTelemetrySdk.initialize().getOpenTelemetrySdk
+    )(_.shutdown())
 
     val meter = openTelemetry.getMeter(getClass.getName)
 
