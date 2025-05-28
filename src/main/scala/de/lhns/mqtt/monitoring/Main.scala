@@ -32,6 +32,13 @@ object Main extends OxApp {
     val openTelemetry: OpenTelemetry = useInScope(
       AutoConfiguredOpenTelemetrySdk.initialize().getOpenTelemetrySdk
     )(_.shutdown())
+
+    SdkMeterProvider.builder()
+      .registerView(
+        InstrumentSelector.builder().setName("queueSize").build(),
+        View.builder().setAggregation(Aggregation.drop()).build()
+      )
+
     val meter = openTelemetry.getMeter(getClass.getName)
 
     logger.info("connecting to mqtt server")
