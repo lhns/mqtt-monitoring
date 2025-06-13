@@ -12,7 +12,7 @@ lazy val root = (project in file("."))
     libraryDependencies ++= Seq(
       "ch.qos.logback" % "logback-classic" % "1.5.18",
       "co.fs2" %% "fs2-io" % "3.12.0",
-      "com.hivemq" % "hivemq-mqtt-client" % "1.3.5",
+      "com.hivemq" % "hivemq-mqtt-client" % "1.3.7",
       "com.softwaremill.ox" %% "core" % "0.5.13",
       "io.circe" %% "circe-config" % "0.10.1",
       "io.circe" %% "circe-parser" % "0.14.13",
