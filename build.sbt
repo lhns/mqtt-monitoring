@@ -13,7 +13,7 @@ lazy val root = (project in file("."))
       "ch.qos.logback" % "logback-classic" % "1.5.18",
       "co.fs2" %% "fs2-io" % "3.12.0",
       "com.hivemq" % "hivemq-mqtt-client" % "1.3.7",
-      "com.softwaremill.ox" %% "core" % "0.5.15",
+      "com.softwaremill.ox" %% "core" % "0.6.1",
       "io.circe" %% "circe-config" % "0.10.1",
       "io.circe" %% "circe-parser" % "0.14.13",
       "io.opentelemetry" % "opentelemetry-api" % "1.51.0",
