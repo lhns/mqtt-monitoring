@@ -14,7 +14,7 @@ lazy val root = (project in file("."))
       "co.fs2" %% "fs2-io" % "3.12.0",
       "com.hivemq" % "hivemq-mqtt-client" % "1.3.7",
       "com.softwaremill.ox" %% "core" % "0.5.15",
-      "io.circe" %% "circe-config" % "0.10.1",
+      "io.circe" %% "circe-config" % "0.10.2",
       "io.circe" %% "circe-parser" % "0.14.13",
       "io.opentelemetry" % "opentelemetry-api" % "1.51.0",
       "io.opentelemetry" % "opentelemetry-exporter-otlp" % "1.51.0",
