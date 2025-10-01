@@ -10,7 +10,7 @@ lazy val root = (project in file("."))
   .settings(
     name := "mqtt-monitoring",
     libraryDependencies ++= Seq(
-      "ch.qos.logback" % "logback-classic" % "1.5.18",
+      "ch.qos.logback" % "logback-classic" % "1.5.19",
       "co.fs2" %% "fs2-io" % "3.12.0",
       "com.hivemq" % "hivemq-mqtt-client" % "1.3.7",
       "com.softwaremill.ox" %% "core" % "0.7.3",
