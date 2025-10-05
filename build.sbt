@@ -16,9 +16,9 @@ lazy val root = (project in file("."))
       "com.softwaremill.ox" %% "core" % "1.0.1",
       "io.circe" %% "circe-config" % "0.10.2",
       "io.circe" %% "circe-parser" % "0.14.15",
-      "io.opentelemetry" % "opentelemetry-api" % "1.51.0",
-      "io.opentelemetry" % "opentelemetry-exporter-otlp" % "1.51.0",
-      "io.opentelemetry" % "opentelemetry-sdk-extension-autoconfigure" % "1.51.0",
+      "io.opentelemetry" % "opentelemetry-api" % "1.54.1",
+      "io.opentelemetry" % "opentelemetry-exporter-otlp" % "1.54.1",
+      "io.opentelemetry" % "opentelemetry-sdk-extension-autoconfigure" % "1.54.1",
       "org.log4s" %% "log4s" % "1.10.0",
       "org.scalameta" %% "munit" % "1.2.0" % Test
     ),
