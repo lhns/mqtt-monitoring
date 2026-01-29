@@ -20,7 +20,7 @@ lazy val root = (project in file("."))
       "io.opentelemetry" % "opentelemetry-exporter-otlp" % "1.55.0",
       "io.opentelemetry" % "opentelemetry-sdk-extension-autoconfigure" % "1.55.0",
       "org.log4s" %% "log4s" % "1.10.0",
-      "org.scalameta" %% "munit" % "1.2.1" % Test
+      "org.scalameta" %% "munit" % "1.2.2" % Test
     ),
     testFrameworks += new TestFramework("munit.Framework"),
     assembly / assemblyJarName := s"${name.value}-${version.value}.sh.bat",
