@@ -188,7 +188,13 @@ object Main extends OxApp {
               filter.valueMappingsOrDefault.collectFirst(Function.unlift { (pattern, replacement) =>
                 val matcher = pattern.pattern.matcher(string)
                 if (matcher.matches())
-                  Some(matcher.replaceFirst(replacement))
+                  replacement match {
+                    case ExtendedGroupPattern.Replacement.PatternReplacement(patternReplacement) =>
+                      Some(matcher.replaceFirst(patternReplacement))
+
+                    case ExtendedGroupPattern.Replacement.LiteralReplacement(literalReplacement) =>
+                      Some(literalReplacement)
+                  }
                 else
                   None
               }) match {
@@ -213,13 +219,15 @@ object Main extends OxApp {
             MDC("topic") = topic.toString
             MDC("metric") = filter.metricNameOrDefault
 
-            val labels: Map[String, String] = filter.labelMatchersOrDefault.collectFirst(Function.unlift { pattern =>
-              val matcher = pattern.pattern.matcher(topic.toString)
-              if (matcher.matches())
-                Some(pattern.namedGroupMatches(matcher))
-              else
-                None
-            }).getOrElse(Map.empty)
+            val labels: Map[String, String] =
+              filter.labelsOrDefault ++
+                filter.labelMatchersOrDefault.collectFirst(Function.unlift { pattern =>
+                  val matcher = pattern.pattern.matcher(topic.toString)
+                  if (matcher.matches())
+                    Some(pattern.namedGroupMatches(matcher))
+                  else
+                    None
+                }).getOrElse(Map.empty)
 
             MDC.addAll(labels.map((k, v) => s"label.$k" -> v))
 

@@ -1,7 +1,8 @@
 package de.lhns.mqtt.monitoring
 
 import cats.syntax.all.*
-import io.circe.{Codec, KeyDecoder, KeyEncoder}
+import de.lhns.mqtt.monitoring.ExtendedGroupPattern.*
+import io.circe.{Codec, Decoder, Encoder, JsonNumber, KeyDecoder, KeyEncoder}
 
 import java.util.UUID
 import java.util.regex.{MatchResult, Matcher, Pattern}
@@ -15,7 +16,7 @@ case class ExtendedGroupPattern private(
   override def toString: String = patternString
 
   val groupIndices: Map[String, Int] = {
-    val groups = pattern.namedGroups
+    val groups = getNamedGroups(pattern)
     groupAliases.map((groupName, uuidAlias) => groupName -> groups.get(uuidAlias).toInt)
   }
 
@@ -42,6 +43,27 @@ object ExtendedGroupPattern {
     }
     ExtendedGroupPattern(aliasedPattern, groupAliases)
   }
+
+  enum Replacement {
+    case PatternReplacement(string: String)
+    case LiteralReplacement(string: String)
+  }
+
+  object Replacement {
+    given Codec[Replacement] = Codec.from(
+      Decoder[JsonNumber].map(e => LiteralReplacement(e.toString))
+        .or(Decoder[String].map(PatternReplacement(_))),
+      Encoder[String].contramap[Replacement] {
+        case PatternReplacement(string) => string
+        case LiteralReplacement(string) => string
+      }
+    )
+  }
+
+  private lazy val namedGroupsMethod = classOf[Pattern].getDeclaredMethod("namedGroups")
+
+  private def getNamedGroups(pattern: Pattern): java.util.Map[String, java.lang.Integer] =
+    namedGroupsMethod.invoke(pattern).asInstanceOf[java.util.Map[String, java.lang.Integer]]
 
   given keyDecoder: KeyDecoder[ExtendedGroupPattern] = KeyDecoder[String].map(compile)
 
