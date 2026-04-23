@@ -40,7 +40,7 @@ object Main extends OxApp {
     val client =
       MqttClient.builder()
         .useMqttVersion3()
-        .identifier(s"mqtt-monitoring/${UUID.randomUUID()}")
+        .identifier(s"mqtt-monitoring-${UUID.randomUUID()}")
         .serverHost(config.server.host.toString)
         .serverPort(config.server.port.value)
         .buildBlocking()
