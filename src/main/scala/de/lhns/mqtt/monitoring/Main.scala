@@ -63,9 +63,6 @@ object Main extends OxApp {
 
     logger.info("connected to mqtt server")
 
-    // TODO: unsubscribe
-
-
     val messages = Channel.bufferedDefault[Mqtt3Publish]
 
     fork {
@@ -78,19 +75,24 @@ object Main extends OxApp {
         .map(_.stripJsonPattern)
         .distinct
         .foreach { topic =>
-          useInScope {
-            logger.debug(s"subscribing to mqtt topic: $topic")
-            client
-              .subscribeWith()
-              .topicFilter(topic.toString)
-              .send()
-            logger.debug(s"subscribed to mqtt topic: $topic")
-          } { _ =>
-            logger.debug(s"unsubscribing from mqtt topic: $topic")
-            client.unsubscribeWith()
-              .topicFilter(topic.toString)
-              .send()
-            logger.debug(s"unsubscribed from mqtt topic: $topic")
+          try {
+            useInScope {
+              logger.info(s"subscribing to mqtt topic: $topic")
+              client
+                .subscribeWith()
+                .topicFilter(topic.toString)
+                .send()
+              logger.info(s"subscribed to mqtt topic: $topic")
+            } { _ =>
+              logger.info(s"unsubscribing from mqtt topic: $topic")
+              client.unsubscribeWith()
+                .topicFilter(topic.toString)
+                .send()
+              logger.info(s"unsubscribed from mqtt topic: $topic")
+            }
+          } catch {
+            case NonFatal(e) =>
+              throw new RuntimeException(s"failed to subscribe to mqtt topic: $topic", e)
           }
         }
 
