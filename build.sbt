@@ -15,7 +15,7 @@ lazy val root = (project in file("."))
       "com.hivemq" % "hivemq-mqtt-client" % "1.3.13",
       "com.softwaremill.ox" %% "core" % "1.0.4",
       "io.circe" %% "circe-config" % "0.10.2",
-      "io.circe" %% "circe-parser" % "0.14.15",
+      "io.circe" %% "circe-parser" % "0.14.16",
       "io.opentelemetry" % "opentelemetry-api" % "1.61.0",
       "io.opentelemetry" % "opentelemetry-exporter-otlp" % "1.61.0",
       "io.opentelemetry" % "opentelemetry-sdk-extension-autoconfigure" % "1.61.0",
