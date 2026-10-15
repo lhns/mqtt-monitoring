@@ -71,6 +71,8 @@ jobs:
           for TAG in "${TAGS[@]}"; do docker push "$IMAGE_ID:$TAG"; done
   dependency-graph:
     name: Update Dependency Graph
+    # Dependabot runs get a read-only token, so the submission would fail with 403
+    if: github.actor != 'dependabot[bot]'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
