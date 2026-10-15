@@ -30,6 +30,8 @@ lazy val root = (project in file("."))
       case PathList(paths@_*) if paths.last == "module-info.class" => MergeStrategy.discard
       case PathList("META-INF", path@_*) if path.lastOption.exists(_.endsWith(".kotlin_module")) => MergeStrategy.discard
       case PathList("META-INF", path@_*) if path.lastOption.exists(_.endsWith("io.netty.versions.properties")) => MergeStrategy.discard
+      // OSGi metadata of multi-release jars (okhttp, opentelemetry); unused in a fat jar
+      case PathList("META-INF", "versions", _, "OSGI-INF", _*) => MergeStrategy.discard
       case x =>
         val oldStrategy = (assembly / assemblyMergeStrategy).value
         oldStrategy(x)
