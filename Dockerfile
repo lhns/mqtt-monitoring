@@ -1,5 +1,5 @@
 FROM eclipse-temurin:25
 
-COPY target/scala-*/*.sh.bat ./
+COPY target/out/jvm/scala-*/*/*.sh.bat ./
 
 CMD exec ./*.sh.bat
