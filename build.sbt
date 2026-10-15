@@ -16,9 +16,9 @@ lazy val root = (project in file("."))
       "com.softwaremill.ox" %% "core" % "1.0.9",
       "io.circe" %% "circe-config" % "0.10.2",
       "io.circe" %% "circe-parser" % "0.14.17",
-      "io.opentelemetry" % "opentelemetry-api" % "1.61.0",
-      "io.opentelemetry" % "opentelemetry-exporter-otlp" % "1.61.0",
-      "io.opentelemetry" % "opentelemetry-sdk-extension-autoconfigure" % "1.61.0",
+      "io.opentelemetry" % "opentelemetry-api" % "1.67.0",
+      "io.opentelemetry" % "opentelemetry-exporter-otlp" % "1.67.0",
+      "io.opentelemetry" % "opentelemetry-sdk-extension-autoconfigure" % "1.67.0",
       "org.log4s" %% "log4s" % "1.10.0",
       "org.scalameta" %% "munit" % "1.3.6" % Test
     ),
@@ -30,6 +30,8 @@ lazy val root = (project in file("."))
       case PathList(paths@_*) if paths.last == "module-info.class" => MergeStrategy.discard
       case PathList("META-INF", path@_*) if path.lastOption.exists(_.endsWith(".kotlin_module")) => MergeStrategy.discard
       case PathList("META-INF", path@_*) if path.lastOption.exists(_.endsWith("io.netty.versions.properties")) => MergeStrategy.discard
+      // OSGi metadata of multi-release jars (okhttp, opentelemetry); unused in a fat jar
+      case PathList("META-INF", "versions", _, "OSGI-INF", _*) => MergeStrategy.discard
       case x =>
         val oldStrategy = (assembly / assemblyMergeStrategy).value
         oldStrategy(x)
