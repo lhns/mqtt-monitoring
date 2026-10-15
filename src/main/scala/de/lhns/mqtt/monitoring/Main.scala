@@ -2,7 +2,6 @@ package de.lhns.mqtt.monitoring
 
 import com.hivemq.client.mqtt.mqtt3.message.publish.Mqtt3Publish
 import com.hivemq.client.mqtt.{MqttClient, MqttGlobalPublishFilter}
-import io.circe.Json
 import io.opentelemetry.api.OpenTelemetry
 import io.opentelemetry.api.common.{AttributeKey, Attributes}
 import io.opentelemetry.api.metrics.DoubleGauge
@@ -98,61 +97,10 @@ object Main extends OxApp {
 
       logger.info("listening for mqtt messages")
 
-      while (true) {
+      forever {
         messages.send(publishes.receive())
       }
     }
-
-    def valuesFromJson(
-                        json: Json,
-                        topic: Topic,
-                        mapping: Topic => String => Option[Double],
-                        enableArrays: Boolean
-                      ): Map[Topic, Double] = {
-      json.fold[Map[Topic, Double]](
-        jsonNull = Map.empty,
-        jsonBoolean =
-          if (_) Map(topic -> 1)
-          else Map(topic -> 0),
-        jsonNumber = e => Map(topic -> e.toDouble),
-        jsonString = mapping(topic)(_) match {
-          case Some(double) => Map(topic -> double)
-          case None => Map.empty
-        },
-        jsonArray = elems =>
-          if (enableArrays)
-            elems.zipWithIndex.toMap.flatMap((e, i) =>
-              valuesFromJson(e, topic / i.toString, mapping, enableArrays)
-            )
-          else
-            Map.empty,
-        jsonObject = obj =>
-          obj.toMap.flatMap((k, v) =>
-            valuesFromJson(v, topic / k, mapping, enableArrays)
-          )
-      )
-    }
-
-    def valuesFromString(
-                          string: String,
-                          topic: Topic,
-                          mapping: Topic => String => Option[Double],
-                          enableArrays: Boolean
-                        ): Map[Topic, Double] =
-      string.toDoubleOption match {
-        case Some(double) =>
-          Map(topic -> double)
-        case None =>
-          io.circe.parser.parse(string) match {
-            case Right(json) =>
-              valuesFromJson(json, topic / "#>", mapping, enableArrays)
-            case Left(_) =>
-              mapping(topic)(string) match {
-                case Some(double) => Map(topic -> double)
-                case None => Map.empty
-              }
-          }
-      }
 
     val topicKey = AttributeKey.stringKey("mqtt.topic")
 
@@ -162,10 +110,12 @@ object Main extends OxApp {
         metricName -> gauge
       }.toMap
 
-    while (true) {
+    forever {
       val msg = messages.receive()
       val topic = Topic(msg.getTopic)
 
+      // don't leak metric/label entries from the previous message
+      MDC.clear()
       MDC("topic") = topic.toString
 
       config.filters
@@ -174,15 +124,8 @@ object Main extends OxApp {
         .foreach { filter =>
           val gauge = gaugeByMetricName(filter.metricNameOrDefault)
 
-          val msgString = try {
-            new String(msg.getPayloadAsBytes, StandardCharsets.UTF_8)
-          } catch {
-            case NonFatal(e) =>
-              if (!filter.ignoreWarningsOrDefault)
-                logger.warn(e)(s"mqtt message is not a string")
-              throw e
-          }
-          val values = valuesFromString(
+          val msgString = new String(msg.getPayloadAsBytes, StandardCharsets.UTF_8)
+          val values = Values.valuesFromString(
             string = msgString,
             topic = topic,
             mapping = topic => string => {
@@ -251,9 +194,5 @@ object Main extends OxApp {
           }
         }
     }
-
-    MDC.clear()
-
-    ExitCode.Success
   }
 }

@@ -16,7 +16,7 @@ case class ExtendedGroupPattern private(
   override def toString: String = patternString
 
   val groupIndices: Map[String, Int] = {
-    val groups = getNamedGroups(pattern)
+    val groups = pattern.namedGroups()
     groupAliases.map((groupName, uuidAlias) => groupName -> groups.get(uuidAlias).toInt)
   }
 
@@ -60,14 +60,9 @@ object ExtendedGroupPattern {
     )
   }
 
-  private lazy val namedGroupsMethod = classOf[Pattern].getDeclaredMethod("namedGroups")
-
-  private def getNamedGroups(pattern: Pattern): java.util.Map[String, java.lang.Integer] =
-    namedGroupsMethod.invoke(pattern).asInstanceOf[java.util.Map[String, java.lang.Integer]]
-
   given keyDecoder: KeyDecoder[ExtendedGroupPattern] = KeyDecoder[String].map(compile)
 
   given keyEncoder: KeyEncoder[ExtendedGroupPattern] = KeyEncoder[String].contramap(_.toString)
 
-  given Codec[ExtendedGroupPattern] = Codec.implied[String].imap(keyDecoder(_).get)(keyEncoder(_))
+  given Codec[ExtendedGroupPattern] = Codec.implied[String].imap(compile)(_.toString)
 }

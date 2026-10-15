@@ -11,7 +11,7 @@ A lightweight Scala service for monitoring MQTT topics and exporting numeric val
 - Supports OpenTelemetry gauge metric exporting
 - Optional array support for JSON lists
 - Configurable via a single JSON environment variable (`CONFIG`)
-- Graceful shutdown and batching support
+- Graceful shutdown
 
 ## Example Configuration
 
@@ -22,13 +22,13 @@ A lightweight Scala service for monitoring MQTT topics and exporting numeric val
   "password": "secret",
   "filters": [
     {
-      "metric": "mqtt.value",
+      "metricName": "mqtt.value",
       "topics": [
         "sensors/+/temp",
         "devices/#",
         "home/lights/#>/state/value"
       ],
-      "labelPatterns": [
+      "labelMatchers": [
         "sensors/(?<device>[^/]+)/(?<type>[^/]+)",
         "devices/(?<id>[^/]+)"
       ],
@@ -49,7 +49,7 @@ A lightweight Scala service for monitoring MQTT topics and exporting numeric val
 
 ### Prerequisites
 
-- JVM 17+
+- JVM 21+
 - MQTT broker (e.g., Mosquitto)
 - OpenTelemetry-compatible backend (e.g., Prometheus, OTLP Collector)
 
@@ -57,10 +57,30 @@ A lightweight Scala service for monitoring MQTT topics and exporting numeric val
 
 ```bash
 export CONFIG='{"server": "...", ...}'  # Or load from file and export
-java -jar mqtt-monitoring.jar
+java -jar mqtt-monitoring-<version>.sh.bat  # executable fat jar (also runs directly on Unix)
 ```
 
+A Docker image is published to `ghcr.io/lhns/mqtt-monitoring`.
+
 Logs will show connection, subscriptions, received values, and metric exports.
+
+### Configuration Options
+
+Top level: `server`, `username`, `password`, `maxCardinality` (optional), `exportInterval` (optional, e.g. `"30s"`), `filters`.
+
+The first filter whose `topics` match a message is used. Per filter:
+
+| Option | Default | Description |
+| --- | --- | --- |
+| `metricName` | `mqtt.value` | Name of the gauge metric |
+| `topics` | required | Topic patterns to match |
+| `discard` | `false` | Drop matching messages |
+| `topicLabel` | `true` | Add the topic as `mqtt.topic` attribute |
+| `labels` | `{}` | Static labels |
+| `labelMatchers` | `[]` | Regexes with named groups, matched against the topic, that become labels |
+| `valueMappings` | `{}` | Regex to value mappings for non-numeric payloads |
+| `enableArrays` | `false` | Extract values from JSON arrays |
+| `ignoreWarnings` | `false` | Suppress warnings for unmapped payloads |
 
 ## OpenTelemetry Integration
 
