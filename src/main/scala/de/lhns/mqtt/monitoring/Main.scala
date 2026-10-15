@@ -118,81 +118,83 @@ object Main extends OxApp {
       MDC.clear()
       MDC("topic") = topic.toString
 
-      config.filters
-        .find(_.topics.exists(_.matches(topic, anchored = true)))
-        .filterNot(_.discardOrDefault)
-        .foreach { filter =>
-          val gauge = gaugeByMetricName(filter.metricNameOrDefault)
+      val result = Routing.route(
+        filters = config.filters,
+        mqttTopic = topic,
+        payload = new String(msg.getPayloadAsBytes, StandardCharsets.UTF_8),
+        mapping = filter => topic => string => {
+          MDC("topic") = topic.toString
+          filter.valueMappingsOrDefault.collectFirst(Function.unlift { (pattern, replacement) =>
+            val matcher = pattern.pattern.matcher(string)
+            if (matcher.matches())
+              replacement match {
+                case ExtendedGroupPattern.Replacement.PatternReplacement(patternReplacement) =>
+                  Some(matcher.replaceFirst(patternReplacement))
 
-          val msgString = new String(msg.getPayloadAsBytes, StandardCharsets.UTF_8)
-          val values = Values.valuesFromString(
-            string = msgString,
-            topic = topic,
-            mapping = topic => string => {
-              MDC("topic") = topic.toString
-              filter.valueMappingsOrDefault.collectFirst(Function.unlift { (pattern, replacement) =>
-                val matcher = pattern.pattern.matcher(string)
-                if (matcher.matches())
-                  replacement match {
-                    case ExtendedGroupPattern.Replacement.PatternReplacement(patternReplacement) =>
-                      Some(matcher.replaceFirst(patternReplacement))
-
-                    case ExtendedGroupPattern.Replacement.LiteralReplacement(literalReplacement) =>
-                      Some(literalReplacement)
-                  }
-                else
-                  None
-              }) match {
-                case None =>
-                  if (!filter.ignoreWarningsOrDefault)
-                    logger.warn(s"no mapping defined for mqtt message: $string")
-                  None
-                case Some(mappedString) =>
-                  mappedString.toDoubleOption match {
-                    case None =>
-                      logger.error(s"mapped value is not a double: $mappedString")
-                      None
-                    case e => e
-                  }
+                case ExtendedGroupPattern.Replacement.LiteralReplacement(literalReplacement) =>
+                  Some(literalReplacement)
               }
-            },
-            enableArrays = filter.enableArraysOrDefault
-          )
-
-          values.foreach { (topic, value) =>
-            MDC.clear()
-            MDC("topic") = topic.toString
-            MDC("metric") = filter.metricNameOrDefault
-
-            val labels: Map[String, String] =
-              filter.labelsOrDefault ++
-                filter.labelMatchersOrDefault.collectFirst(Function.unlift { pattern =>
-                  val matcher = pattern.pattern.matcher(topic.toString)
-                  if (matcher.matches())
-                    Some(pattern.namedGroupMatches(matcher))
-                  else
-                    None
-                }).getOrElse(Map.empty)
-
-            MDC.addAll(labels.map((k, v) => s"label.$k" -> v))
-
-            logger.debug(s"parsed value: $value")
-
-            val attributes =
-              labels.foldLeft {
-                  if (filter.topicLabelOrDefault)
-                    Attributes.builder()
-                      .put(topicKey, topic.toString)
-                  else
-                    Attributes.builder()
-                } { case (attributes, (k, v)) =>
-                  attributes.put(k, v)
-                }
-                .build()
-
-            gauge.set(value, attributes)
+            else
+              None
+          }) match {
+            case None =>
+              if (!filter.ignoreWarningsOrDefault)
+                logger.warn(s"no mapping defined for mqtt message: $string")
+              None
+            case Some(mappedString) =>
+              mappedString.toDoubleOption match {
+                case None =>
+                  logger.error(s"mapped value is not a double: $mappedString")
+                  None
+                case e => e
+              }
           }
         }
+      )
+
+      result.exports.foreach { (filter, values) =>
+        val gauge = gaugeByMetricName(filter.metricNameOrDefault)
+
+        values.foreach { (topic, value) =>
+          MDC.clear()
+          MDC("topic") = topic.toString
+          MDC("metric") = filter.metricNameOrDefault
+
+          val labels: Map[String, String] =
+            filter.labelsOrDefault ++
+              filter.labelMatchersOrDefault.collectFirst(Function.unlift { pattern =>
+                val matcher = pattern.pattern.matcher(topic.toString)
+                if (matcher.matches())
+                  Some(pattern.namedGroupMatches(matcher))
+                else
+                  None
+              }).getOrElse(Map.empty)
+
+          MDC.addAll(labels.map((k, v) => s"label.$k" -> v))
+
+          logger.debug(s"parsed value: $value")
+
+          val attributes =
+            labels.foldLeft {
+                if (filter.topicLabelOrDefault)
+                  Attributes.builder()
+                    .put(topicKey, topic.toString)
+                else
+                  Attributes.builder()
+              } { case (attributes, (k, v)) =>
+                attributes.put(k, v)
+              }
+              .build()
+
+          gauge.set(value, attributes)
+        }
+      }
+
+      if (result.warnNothingSelected) {
+        MDC.clear()
+        MDC("topic") = topic.toString
+        logger.warn("no value selected by json pattern for mqtt message")
+      }
     }
   }
 }
