@@ -44,6 +44,16 @@ object Config {
     val enableArraysOrDefault: Boolean = enableArrays.getOrElse(false)
 
     val ignoreWarningsOrDefault: Boolean = ignoreWarnings.getOrElse(false)
+
+    // Patterns whose mqtt part matches the topic; a plain one among them selects every value.
+    def matchedPatterns(mqttTopic: Topic): List[TopicPattern] =
+      topics.filter(_.stripJsonPattern.matches(mqttTopic))
+
+    def valueSelector(mqttTopic: Topic): Option[Topic => Boolean] = {
+      val matched = matchedPatterns(mqttTopic)
+      if (matched.isEmpty) None
+      else Some(valueTopic => matched.exists(p => !p.hasJsonPattern || p.matches(valueTopic)))
+    }
   }
 
   private given Codec[SocketAddress[Host]] =

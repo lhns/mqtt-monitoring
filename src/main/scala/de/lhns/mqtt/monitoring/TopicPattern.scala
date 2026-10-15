@@ -6,9 +6,16 @@ import io.circe.Codec
 case class TopicPattern(segments: List[String]) {
   override def toString: String = segments.mkString("/")
 
-  def matches(topic: Topic, anchored: Boolean): Boolean = {
+  def matches(topic: Topic): Boolean = {
     @annotation.tailrec
     def loop(pattern: List[String], topic: List[String]): Boolean = (pattern, topic) match {
+      case ("#" :: "#>" :: _) -> ts =>
+        // '#' directly before '#>' spans the mqtt levels; '#>' only occurs where Values inserts it
+        ts.dropWhile(_ != "#>") match {
+          case Nil => false
+          case rest => loop(pattern.tail, rest)
+        }
+
       case ("#" :: _) -> _ =>
         // '#' matches anything remaining, must be last in pattern
         pattern.tail.isEmpty
@@ -26,10 +33,6 @@ case class TopicPattern(segments: List[String]) {
         // Pattern is shorter than topic
         false
 
-      case (_ :: _, Nil) if !anchored =>
-        // Pattern is longer than topic
-        true
-
       case _ =>
         false
     }
@@ -41,6 +44,8 @@ case class TopicPattern(segments: List[String]) {
   A non-standard way to specify the structure of a json payload.
   Example: mqtt/topic/+/test/#>/json/#/value
   */
+  def hasJsonPattern: Boolean = segments.contains("#>")
+
   def stripJsonPattern: TopicPattern =
     TopicPattern(segments.takeWhile(_ != "#>"))
 }
