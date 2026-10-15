@@ -1,12 +1,12 @@
 package de.lhns.mqtt.monitoring
 
-import cats.syntax.all.*
 import com.comcast.ip4s.{Host, SocketAddress}
 import de.lhns.mqtt.monitoring.Config.FilterConfig
-import io.circe.{Codec, JsonNumber}
+import io.circe.Codec
 
 import scala.collection.immutable.ListMap
 import scala.concurrent.duration.{Duration, FiniteDuration}
+import scala.util.{Success, Try}
 
 case class Config(
                    server: SocketAddress[Host],
@@ -46,18 +46,16 @@ object Config {
     val ignoreWarningsOrDefault: Boolean = ignoreWarnings.getOrElse(false)
   }
 
-  private given Codec[SocketAddress[Host]] = Codec.implied[String].imap(SocketAddress.fromString(_).get)(_.toString)
+  private given Codec[SocketAddress[Host]] =
+    Codec.implied[String].iemap(e => SocketAddress.fromString(e).toRight(s"Invalid server address: $e"))(_.toString)
 
-  private given Codec[FiniteDuration] = Codec.implied[String].imap(Duration(_) match {
-    case duration: FiniteDuration => duration
-    case e => throw new RuntimeException(s"Unsupported duration: $e")
-  })(_.toString)
-
-  private given Codec[BigDecimal] = Codec.implied[JsonNumber].imap(e =>
-    e.toBigDecimal.getOrElse(throw new RuntimeException(s"Invalid decimal: $e"))
-  )(e =>
-    JsonNumber.fromDecimalStringUnsafe(e.toString)
-  )
+  private given Codec[FiniteDuration] =
+    Codec.implied[String].iemap(e =>
+      Try(Duration(e)) match {
+        case Success(duration: FiniteDuration) => Right(duration)
+        case _ => Left(s"Invalid finite duration: $e")
+      }
+    )(_.toString)
 
   def fromEnv: Config =
     sys.env.get("CONFIG")

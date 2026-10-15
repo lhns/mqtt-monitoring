@@ -1,4 +1,5 @@
-import de.lhns.mqtt.monitoring.{Topic, TopicPattern}
+package de.lhns.mqtt.monitoring
+
 import munit.FunSuite
 
 class TopicMatcherSuite extends FunSuite {
